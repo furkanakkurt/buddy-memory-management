@@ -35,6 +35,8 @@ void *allocate(void* list_add, int order){
 		*(void **) (available_list[j].head + 2 * sizeof(int) + sizeof(void *)) = NULL; // head->back = NULL
 	}
 
+	printf("The block with address: %p is removed from available list index: %d\n", available_block, j);
+
 	while (j != order){ // need to be splitted
 		j--; // decrease order
 		void *splitted_add = available_block + (MIN_SIZE * (1 << j)); // next block
@@ -59,32 +61,52 @@ void *allocate(void* list_add, int order){
 		void **back = (void**) tmp_add;
 		*back = NULL;
 		tmp_add += sizeof(void *);
-		
 
-		// add splitted and available block to the available list
+
+		// add splitted and available block to the available list -- sorted
 		// if head is null, new head becomes splitted address
-	  if (available_list[j].head == NULL) { //empty
+	  if (available_list[j].head == NULL && available_list[j].tail == NULL) { //empty
 	    	available_list[j].head = splitted_add;
-		    // available_list[j].tail = splitted_add;
+				available_list[j].tail = splitted_add;
 		}
 	    else {	// tail->next
-	    	*(void **)(available_list[j].tail + 2 * sizeof(int)) = splitted_add;
-	    	// available_list[j].tail = splitted_add;
-	    }
-	    available_list[j].tail = splitted_add;
+				void *next_block;
+				for (next_block = available_list[j].head; next_block != NULL && splitted_add > next_block; next_block = *(void **)(next_block + 2 * sizeof(int)));
+				if (next_block == NULL){ // next to the tail
+					*(void **)(available_list[j].tail + 2 * sizeof(int)) = splitted_add; // tail->next = splitted
+					back = available_list[j].tail; //splitted->back = tail
+					available_list[j].tail = splitted_add; //tail = splitted
+				}
+				else if (next_block == available_list[j].head){
+					next = available_list[j].head; // splitted->next = head
+					*(void **)(available_list[j].head + 2 * sizeof(int) + sizeof(void *)) = splitted_add; //head->back = splitted
+					available_list[j].head = splitted_add; // head = splitted
+				}
+				else {
+					void *prev = *(void **)(next_block + 2 * sizeof(int) + sizeof(void *)); //prev = next_block->back
+					*(void **)(splitted_add + 2 * sizeof(int)) = next_block; // splitted->next = next_block
+					*(void **)(next_block + 2 * sizeof(int) + sizeof(void *)) = splitted_add; //next_block->back = splitted
+					*(void **)(prev + 2 * sizeof(int)) = splitted_add; // prev->next = splitted
+					*(void **)(splitted_add + 2 * sizeof(int) + sizeof(void *)) = prev; // splitted->back = prev
+				}
+	   }
+
+		 printf("The block with address: %p is added to available list index: %d\n", splitted_add, j);
 	}
 
 	int *tag = (int *) available_block;
 	*tag = 0;
 
-	printf("ADD: %p\n", available_block);
+	int *k = (int *) (available_block + sizeof(int));
+	*k = order;
+
 	return available_block + sizeof(int);
 }
 
 int main(int argc, char const *argv[]) {
   /* code */
 	void *list_add = malloc(TOT_SIZE);
-
+	// initialize
 	int index;
 	for (index = 0; index < MAX_ORDER - 1; ++index){
 		available_list[index].head = NULL;
@@ -102,7 +124,7 @@ int main(int argc, char const *argv[]) {
 
 	// order of the block
 	int *k = (int *) tmp_add;
-	*k = 3;
+	*k = MAX_ORDER;
 	tmp_add += sizeof(int);
 
 	// next block pointer
@@ -113,7 +135,10 @@ int main(int argc, char const *argv[]) {
 	// back block pointer
 	void **back = (void**) tmp_add;
 	*back = NULL;
-	tmp_add += sizeof(void *);
 
+	allocate(list_add, 1);
+	allocate(list_add, 0);
+	allocate(list_add, 1);
+	allocate(list_add, 0);
 	return 0;
 }
