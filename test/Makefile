@@ -1,5 +1,5 @@
 all: buddy
-buddy: buddy_mem_test.c
-	gcc -Wall -g -o buddy buddy_mem_test.c
+buddy: buddy_memory.c
+	gcc -Wall -g -o buddy_mem buddy_memory.c
 clean:
-	rm buddy
+	rm buddy_mem
