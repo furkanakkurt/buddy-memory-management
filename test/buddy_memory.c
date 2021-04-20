@@ -10,11 +10,12 @@ struct available_node{
 	void *tail;
 };
 
-// the whole segment size is 8192
-// the min req size = 128
 struct available_node available_list[MAX_ORDER + 1];
 
+
 /* allocates memory of size 2^order */
+// TODO constrains will be added
+// instead of order - reqsize needed
 void *allocate(void* list_add, int order){
 
 	int j;
@@ -101,6 +102,11 @@ void *allocate(void* list_add, int order){
 	*k = order;
 
 	return available_block + sizeof(int);
+}
+
+void deallocate(void *list_add, void *ptr){
+	// is ptr block has a buddy
+
 }
 
 int main(int argc, char const *argv[]) {
