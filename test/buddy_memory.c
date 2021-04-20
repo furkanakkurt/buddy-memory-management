@@ -148,6 +148,8 @@ void deallocate(void *list_add, void *ptr){
 		}
 	}
 
+	// *(int *) (block_add) = 0;
+
 	// finding buddy add
 	int buddy_num = (block_add - list_add) / size_block;
 	void *buddy_add;
@@ -158,7 +160,7 @@ void deallocate(void *list_add, void *ptr){
 
 	// can buddy and block be merged
 	int buddy_order = *(int *) (buddy_add + sizeof(int));
-	int buddy_tag = *(int *) (buddy_add + sizeof(int));
+	int buddy_tag = *(int *) (buddy_add);
 	if (buddy_order == order_of_block && buddy_tag == 1){ // can be merged
 			// merge add
 			void *merge_add;
