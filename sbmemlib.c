@@ -5,11 +5,12 @@
 
 // Define a name for your shared memory; you can give any name that start with a slash character; it will be like a filename.
 #define SHAREDMEM_NAME "/shared_memory"
-
+#define MAX_PROCESSES_ALLOWED 10
 // Define semaphore(s)
 
 
 // Define your stuctures and variables. 
+int process_count = 0;
 
 // You will use semaphore(s) in your library to protect your shared structures. 
 // Processes may call allocation and free functions concurrently. 
@@ -25,7 +26,6 @@
 // for destruction, use sbmem_remove() ?? 
 int sbmem_init(int segmentsize)
 {
-
 	// to map shared memory into address space of the process
 	void *shm_start;
 
@@ -52,8 +52,8 @@ int sbmem_init(int segmentsize)
 	fd = shm_open(sharedmem_name, O_RDWR | O_CREAT, 0660);
 
 	if (fd == -1) {
-		perror("Error while creating a shared memory segment.\n");
-		exit(1);
+		// perror("Error while creating a shared memory segment.\n");
+		return -1;
 	}
 	else {
 		printf("Shared memory segment has been initialized.\n");
@@ -73,15 +73,35 @@ int sbmem_init(int segmentsize)
 	// file descriptor can be closed
 	close(fd);
 
+
 	printf ("sbmem init called"); // remove all printfs when you are submitting to us.  
-    return (0); 
+    return -1; 
 }
 
 int sbmem_remove()
 {
+	// return from shm_unlink()
+	int ret;
+
+	// name of the shared memory segment
+	char sharedmem_name[100];
+	strcpy(sharedmem_name, SHAREDMEM_NAME);
+
+	ret = shm_unlink(sharedmem_name);
+
+	if (ret == 0) {
+		printf("Shared segment is removed.\n");
+	} 
+	else {
+		// perror("Error while removing the shared segment.\n");
+		return -1;
+	}
+
+	// todo: remove semaphores
+
 
 	// remove shared memory segment from system
-	// use shm_unlin()
+	// use shm_unlink()
 	// do necessary cleanups, such as removing semaphores 
 
     return (0); 
@@ -89,6 +109,11 @@ int sbmem_remove()
 
 int sbmem_open()
 {
+
+	// if too many processes, return -1
+	process_count += 1;
+
+	
 
 	// this function indicates to the library that the process would like
 	// to use the library
