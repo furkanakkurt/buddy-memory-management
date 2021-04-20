@@ -74,46 +74,81 @@ void *allocate(void* list_add, int order){
 	    	available_list[j].head = splitted_add;
 				available_list[j].tail = splitted_add;
 		}
-	    else {
-				void *next_block;
-				for (next_block = available_list[j].head; next_block != NULL && splitted_add > next_block; next_block = *(void **)(next_block + 2 * sizeof(int)));
-				if (next_block == NULL){ // next to the tail
-					*(void **)(available_list[j].tail + 2 * sizeof(int)) = splitted_add; // tail->next = splitted
-					*(void **) (splitted_add + 2*sizeof(int) + sizeof(void *)) = available_list[j].tail; //splitted->back = tail
-					available_list[j].tail = splitted_add; //tail = splitted
-				}
-				else if (next_block == available_list[j].head){
-					*(void **) (splitted_add + 2*sizeof(int)) = available_list[j].head; // splitted->next = head
-					*(void **)(available_list[j].head + 2 * sizeof(int) + sizeof(void *)) = splitted_add; //head->back = splitted
-					available_list[j].head = splitted_add; // head = splitted
-				}
-				else {
-					void *prev = *(void **)(next_block + 2 * sizeof(int) + sizeof(void *)); //prev = next_block->back
-					*(void **)(splitted_add + 2 * sizeof(int)) = next_block; // splitted->next = next_block
-					*(void **)(next_block + 2 * sizeof(int) + sizeof(void *)) = splitted_add; //next_block->back = splitted
-					*(void **)(prev + 2 * sizeof(int)) = splitted_add; // prev->next = splitted
-					*(void **)(splitted_add + 2 * sizeof(int) + sizeof(void *)) = prev; // splitted->back = prev
-				}
-	   }
+    else {
+			void *next_block;
+			for (next_block = available_list[j].head; next_block != NULL && splitted_add > next_block; next_block = *(void **)(next_block + 2 * sizeof(int)));
+			if (next_block == NULL){ // next to the tail
+				*(void **)(available_list[j].tail + 2 * sizeof(int)) = splitted_add; // tail->next = splitted
+				*(void **) (splitted_add + 2*sizeof(int) + sizeof(void *)) = available_list[j].tail; //splitted->back = tail
+				available_list[j].tail = splitted_add; //tail = splitted
+			}
+			else if (next_block == available_list[j].head){
+				*(void **) (splitted_add + 2*sizeof(int)) = available_list[j].head; // splitted->next = head
+				*(void **)(available_list[j].head + 2 * sizeof(int) + sizeof(void *)) = splitted_add; //head->back = splitted
+				available_list[j].head = splitted_add; // head = splitted
+			}
+			else {
+				void *prev = *(void **)(next_block + 2 * sizeof(int) + sizeof(void *)); //prev = next_block->back
+				*(void **)(splitted_add + 2 * sizeof(int)) = next_block; // splitted->next = next_block
+				*(void **)(next_block + 2 * sizeof(int) + sizeof(void *)) = splitted_add; //next_block->back = splitted
+				*(void **)(prev + 2 * sizeof(int)) = splitted_add; // prev->next = splitted
+				*(void **)(splitted_add + 2 * sizeof(int) + sizeof(void *)) = prev; // splitted->back = prev
+			}
+   }
 
-		 printf("The block with address: %p is added to available list index: %d\n", splitted_add, j);
+	 	printf("The block with address: %p is added to available list index: %d\n", splitted_add, j);
 	}
 
-	int *tag = (int *) available_block;
-	*tag = 0;
-
-	int *k = (int *) (available_block + sizeof(int));
-	*k = order;
+	*(int *) available_block = 0;
+	*(int *) (available_block + sizeof(int)) = order;
 
 	return available_block + 2 * sizeof(int);
 }
 
 void deallocate(void *list_add, void *ptr){
 	void *block_add = ptr - 2*sizeof(int);
-
-	// finding buddy add
 	int order_of_block = *(int *) (block_add + sizeof(int));
 	int size_block = MIN_SIZE * (1 << order_of_block);
+
+	// remove if block exist
+	if (*(int *) (block_add) == 1){
+		// remove existing block from available list
+		if (block_add == available_list[order_of_block].head){
+			if (available_list[order_of_block].tail == available_list[order_of_block].head){
+				available_list[order_of_block].tail = NULL;
+				available_list[order_of_block].head = NULL;
+			}
+			else{
+				// void *rem = available_list[order_of_block].head;
+				available_list[order_of_block].head = *(void **) (available_list[order_of_block].head + 2 * sizeof(int)); // head = head->next
+				*(void **) (block_add + 2 * sizeof(int)) = NULL; // buddy->next = NULL
+				*(void **) (available_list[order_of_block].head + 2 * sizeof(int) + sizeof(void *)) = NULL; // head->back = NULL
+			}
+		}
+		else if (block_add == available_list[order_of_block].tail){
+			if (available_list[order_of_block].tail == available_list[order_of_block].head){
+				available_list[order_of_block].tail = NULL;
+				available_list[order_of_block].head = NULL;
+			}
+			else{
+				// void *rem = available_list[order_of_block].tail;
+				available_list[order_of_block].tail = *(void **) (available_list[order_of_block].tail + 2 * sizeof(int) + sizeof(void *)); // tail = tail->prev
+				*(void **) (block_add + 2 * sizeof(int) + sizeof(void *)) = NULL; // buddy->prev = NULL
+				*(void **) (available_list[order_of_block].tail + 2 * sizeof(int)) = NULL; // tail->next = NULL
+			}
+		}
+		else {
+			void *buddy_next = *(void **) (block_add + 2 * sizeof(int));
+			void *buddy_prev = *(void **) (block_add + 2 * sizeof(int) + sizeof(void *));
+
+			*(void **) (buddy_prev + 2 * sizeof(int)) = buddy_next; //buddy_prev->next = buddy_next
+			*(void **) (buddy_next + 2 * sizeof(int) + sizeof(void *)) = buddy_prev; //buddy_next->prev = buddy_prev
+			*(void **) (block_add + 2 * sizeof(int)) = NULL; // buddy->next = NULL
+			*(void **) (block_add + 2 * sizeof(int) + sizeof(void *)) = NULL; // buddy->prev = NULL
+		}
+	}
+
+	// finding buddy add
 	int buddy_num = (block_add - list_add) / size_block;
 	void *buddy_add;
 	if (buddy_num % 2 == 0)
@@ -200,7 +235,7 @@ void deallocate(void *list_add, void *ptr){
 				}
 		 }
 		 printf("The block with address: %p is merged and added to available list index: %d\n", merge_add, buddy_order);
-		 deallocate(list_add, merge_add);
+		 deallocate(list_add, (merge_add + 2*sizeof(int)));
 	}
 	else { // cannot merged
 		*(int *) (block_add) = 1;
@@ -251,27 +286,6 @@ int main(int argc, char const *argv[]) {
 
 	available_list[MAX_ORDER].head = list_add;
 	available_list[MAX_ORDER].tail = list_add;
-
-	// tag - available bit
-	// void *tmp_add = list_add;
-	// int *tag = (int *) tmp_add;
-	// *tag = 1;
-	//
-	// tmp_add += sizeof(int);
-	//
-	// // order of the block
-	// int *k = (int *) tmp_add;
-	// *k = MAX_ORDER;
-	// tmp_add += sizeof(int);
-	//
-	// // next block pointer
-	// void **next = (void**) tmp_add;
-	// *next = NULL;
-	// tmp_add += sizeof(void *);
-	//
-	// // back block pointer
-	// void **back = (void**) tmp_add;
-	// *back = NULL;
 
 	*(int *) (list_add) = 1;
 	*(int *) (list_add + sizeof(int)) = MAX_ORDER;
