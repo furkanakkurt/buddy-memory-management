@@ -374,7 +374,7 @@ void *sbmem_alloc (void *list_add, int order)
 		// if head is null, new head becomes splitted address
 	  	if (available_list[j].head == -1 && available_list[j].tail == -1) { //empty
 	    	available_list[j].head = splitted_add - starting_add;
-			available_list[j].tail = splitted_add - starting_add;
+				available_list[j].tail = splitted_add - starting_add;
 		}
     	else {
 			long next_block;
@@ -399,7 +399,7 @@ void *sbmem_alloc (void *list_add, int order)
 				*(long *)(starting_add + prev + 2 * sizeof(int)) = splitted_add - starting_add; // prev->next = splitted
 				*(long *)(splitted_add + 2 * sizeof(int) + sizeof(long)) = prev; // splitted->back = prev
 			}
-   		}	
+   		}
 
 	 	printf("The block with address: %p is added to available list index: %d\n", splitted_add, j);
 	}
@@ -556,7 +556,7 @@ void deallocate(void *list_add, void *ptr){
 		}
 		else {
 			long next_block;
-			for (next_block = available_list[order_of_block].head; next_block != -1 && block_add > starting_add + next_block; next_block = *(long *)(starting_add + next_block + 2 * sizeof(int)));	
+			for (next_block = available_list[order_of_block].head; next_block != -1 && block_add > starting_add + next_block; next_block = *(long *)(starting_add + next_block + 2 * sizeof(int)));
 			if (next_block == -1){ // next to the tail
 				*(long *)(starting_add + available_list[order_of_block].tail + 2 * sizeof(int)) = block_add - starting_add; // tail->next = merged
 				*(long *) (block_add + 2*sizeof(int) + sizeof(long)) = available_list[order_of_block].tail; //merged->back = tail
@@ -597,20 +597,20 @@ int main(int argc, char const *argv[]) {
 	*(long *) (list_add + 2*sizeof(int)) = -1;
 	*(long *) (list_add + 2*sizeof(int) + sizeof(long)) = -1;
 
-	void *all_00 = sbmem_alloc(list_add, 0);
-	void *all_10 = sbmem_alloc(list_add, 1);
-	void *all_01 = sbmem_alloc(list_add, 0);
-	void *all_11 = sbmem_alloc(list_add, 1);
-	void *all_12 = sbmem_alloc(list_add, 1);
-	void *all_13 = sbmem_alloc(list_add, 1);
-	void *all_14 = sbmem_alloc(list_add, 1);
-	void *all_20 = sbmem_alloc(list_add, 2);
-
-	void *all_40 = sbmem_alloc(list_add, 1);
-
-	if (all_40 == NULL) {
-		printf("zaaaaaaaaaaaaaa\n");
-	}
+	// void *all_00 = sbmem_alloc(list_add, 0);
+	// void *all_10 = sbmem_alloc(list_add, 1);
+	// void *all_01 = sbmem_alloc(list_add, 0);
+	// void *all_11 = sbmem_alloc(list_add, 1);
+	// void *all_12 = sbmem_alloc(list_add, 1);
+	// void *all_13 = sbmem_alloc(list_add, 1);
+	// void *all_14 = sbmem_alloc(list_add, 1);
+	// void *all_20 = sbmem_alloc(list_add, 2);
+	//
+	// void *all_40 = sbmem_alloc(list_add, 1);
+	//
+	// if (all_40 == NULL) {
+	// 	printf("zaaaaaaaaaaaaaa\n");
+	// }
 	// deallocate(list_add, all_11);
 	// deallocate(list_add, all_13);
 	// deallocate(list_add, all_00);
@@ -621,5 +621,10 @@ int main(int argc, char const *argv[]) {
 	// deallocate(list_add, all_12);
 	// deallocate(list_add, all_21);
 	// deallocate(list_add, all_20);
+
+	void *all_00 = sbmem_alloc(100);
+	// void *all_10 = sbmem_alloc(200);
+	// void *all_01 = sbmem_alloc(100);
+	// void *all_11 = sbmem_alloc(200);
 	return 0;
 }
