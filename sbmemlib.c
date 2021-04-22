@@ -34,34 +34,12 @@ struct available_node {
 	long tail;
 };
 
-void *process_add;
-void *starting_add;
+void *process_add; // starting add of shared memory for a specific process
+void *starting_add; // starting add of the shared segment size
 
-// You will use semaphore(s) in your library to protect your shared structures.
-// Processes may call allocation and free functions concurrently.
-// This should not cause race
-// conditions. You will ensure that by using semaphores.
-
-// create and initialize a shared memory of segmentsize
-// use POSIX shm_open() and ftruncate()
-// if already a shared segment, destroy it first with the same name
-// is successful, return 0, else - 1
-// for destruction, use sbmem_remove() ??
+// shared memory init
 int sbmem_init(int segmentsize)
 {
-	// init semaphores
-	// sem_mutex = sem_open(SEM_MUTEX, O_RDWR | O_CREAT, 0660, 1);
-	// if (sem_mutex < 0) {
-	// 	perror("can not create semaphore\n");
-	// 	exit(1);
-	// }
-	//
-	// sem_count = sem_open(SEM_MUTEX, O_RDWR | O_CREAT, 0660, 1);
-	// if (sem_count < 0) {
-	// 	perror("can not create semaphore\n");
-	// 	exit(1);
-	// }
-
 	// get the order
 	int order = (int) (log(segmentsize / MIN_BLOCK_SIZE) / log(2));
 
@@ -90,10 +68,10 @@ int sbmem_init(int segmentsize)
 	fd = shm_open(SHAREDMEM_NAME, O_RDWR | O_CREAT, 0660);
 
 	if (fd == -1) {
-		// perror("Error while creating a shared memory segment.\n");
+		perror("Error while creating a shared memory segment.\n");
 		return -1;
 	}
-	else {
+	else { // DELETE_PRINT
 		printf("Shared memory segment has been initialized.\n");
 	}
 
@@ -103,9 +81,6 @@ int sbmem_init(int segmentsize)
 	// info about shared memory
 	fstat(fd, &sbuf);
 
-	// mapping
-	//void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
-	// addr: starting address, length: length of the mapping > 0
 	shm_start = mmap(NULL, sbuf.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
 	// file descriptor can be closed
@@ -135,15 +110,33 @@ int sbmem_init(int segmentsize)
 	*(long *) (tmp_add) = -1; //distance next
 	*(long *) (tmp_add) = -1; //distance prev
 
-	printf ("sbmem init called"); // remove all printfs when you are submitting to us.
+	// delete existing ones
+	sem_unlink(SEM_MUTEX);
+	sem_unlink(SEM_COUNT);
 
-    return 0;
+	// create new semaphores
+	sem_mutex = sem_open(SEM_MUTEX, O_RDWR | O_CREAT, 0660, 1);
+	sem_count = sem_open(SEM_COUNT, O_RDWR | O_CREAT, 0660, 1);
+
+  return 0;
 }
 
 int sbmem_remove()
 {
 	// return from shm_unlink()
 	int ret;
+
+	// // remove semaphores
+	int err = sem_unlink(SEM_MUTEX);
+	if (err == -1){
+		perror("Unlink semophore operation failed.");
+		exit(1);
+	}
+	err = sem_unlink(SEM_COUNT);
+	if (err == -1){
+		perror("Unlink semophore operation failed.");
+		exit(1);
+	}
 
 	ret = shm_unlink(SHAREDMEM_NAME);
 
@@ -152,13 +145,9 @@ int sbmem_remove()
 		return 0;
 	}
 	else {
-		// perror("Error while removing the shared segment.\n");
+		perror("Error while removing the shared segment.\n");
 		return -1;
 	}
-
-	// // remove semaphores
-	// sem_close(sem_mutex);
-	// sem_close(sem_count);
 
   return 0;
 }
@@ -174,32 +163,34 @@ int sbmem_open()
 		perror("Error while creating a shared memory segment.\n");
 		return -1;
 	}
-	else {
-		printf("Shared memory segment has been initialized.\n");
-	}
 
 	struct stat sbuf;
 
 	fstat(fd, &sbuf);
 	process_add = mmap(NULL, sbuf.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	close(fd);
+
 	int order  = *(int *) (process_add + sizeof(int));
 	starting_add = process_add + 2*sizeof(int) + (order + 1) * sizeof(struct available_node);
 
-	// sem_wait(sem_count);
-	// int count = *(int *) (process_add);
-	// if (count >= 10)
-	// 	return -1;
-	// (*(int *) process_add)++;
-	// sem_post(sem_count);
+	sem_mutex = sem_open(SEM_MUTEX, O_RDWR);
+	sem_count = sem_open(SEM_COUNT, O_RDWR);
 
-    return (0);
+	sem_wait(sem_count);
+	int count = *(int *) (process_add);
+	if (count >= MAX_PROCESSES_ALLOWED)
+		return -1;
+	(*(int *) process_add)++;
+	sem_post(sem_count);
+
+  return (0);
 }
 
 
 void *sbmem_alloc (int size)
 {
-
+	sem_mutex = sem_open(SEM_MUTEX, O_RDWR);
+	sem_wait(sem_mutex);
 	// allocate memory of size n = 2^k >= reqsize
 	// on success, return pointer to allocated space, else NULL
 
@@ -213,10 +204,11 @@ void *sbmem_alloc (int size)
 	int max_order = *(int *) (process_add + sizeof(int));
 	for (j = order; (*(struct available_node *) (available_list + j * sizeof(struct available_node))).head == -1 && j < max_order; ++j);
 
+
 	long head_tmp = (*(struct available_node *) (available_list + j * sizeof(struct available_node))).head;
 	long tail_tmp = (*(struct available_node *) (available_list + j * sizeof(struct available_node))).tail;
 
-	// void *starting_add = process_add + 2*sizeof(int) + (order + 1) * sizeof(struct available_node);
+	// remove from head
 	void *available_block = starting_add + head_tmp;
 	if (tail_tmp == head_tmp){
 		tail_tmp = -1;
@@ -279,13 +271,16 @@ void *sbmem_alloc (int size)
 	*(int *) available_block = 0;
 	*(int *) (available_block + sizeof(int)) = order;
 
+	sem_post(sem_mutex);
+
 	return available_block + 2 * sizeof(int);
-	// return NULL;
 }
 
 
 void sbmem_free (void *p)
 {
+	sem_mutex = sem_open(SEM_MUTEX, O_RDWR);
+	sem_wait(sem_mutex);
 	void *block_add = p - 2*sizeof(int);
 	int order_of_block = *(int *) (block_add + sizeof(int));
 	int size_block = MIN_BLOCK_SIZE * (1 << order_of_block);
@@ -296,9 +291,9 @@ void sbmem_free (void *p)
 	if (*(int *) (block_add) == 1){
 		// remove existing block from available list
 		if (block_add - starting_add == (*(struct available_node *) (available_list + order_of_block * sizeof(struct available_node))).head){
-				(*(struct available_node *) (available_list + order_of_block * sizeof(struct available_node))).tail = -1;
 				if ((*(struct available_node *) (available_list + order_of_block * sizeof(struct available_node))).tail == (*(struct available_node *) (available_list + order_of_block * sizeof(struct available_node))).head){
-				(*(struct available_node *) (available_list + order_of_block * sizeof(struct available_node))).head = -1;
+					(*(struct available_node *) (available_list + order_of_block * sizeof(struct available_node))).tail = -1;
+					(*(struct available_node *) (available_list + order_of_block * sizeof(struct available_node))).head = -1;
 			}
 			else{
 				(*(struct available_node *) (available_list + order_of_block * sizeof(struct available_node))).head = *(long *) (starting_add + (*(struct available_node *) (available_list + order_of_block * sizeof(struct available_node))).head + 2 * sizeof(int)); // head = head->next
@@ -415,6 +410,7 @@ void sbmem_free (void *p)
 				}
 		 }
 		 printf("The block with address: %p is merged and added to available list index: %d\n", merge_add, buddy_order);
+		 sem_post(sem_mutex);
 		 sbmem_free(merge_add + 2*sizeof(int));
 	}
 	else { // cannot merged
@@ -445,19 +441,40 @@ void sbmem_free (void *p)
 			else {
 				long prev = *(long *)(starting_add + next_block + 2 * sizeof(int) + sizeof(long)); //prev = next_block->back
 				*(long *)(block_add + 2 * sizeof(int)) = next_block; // merged->next = next_block
-				*(long *)(next_block + 2 * sizeof(int) + sizeof(long)) = block_add - starting_add; //next_block->back = merged
-				*(long *)(prev + 2 * sizeof(int)) = block_add - starting_add; // prev->next = merged
+				*(long *)(starting_add + next_block + 2 * sizeof(int) + sizeof(long)) = block_add - starting_add; //next_block->back = merged
+				*(long *)(starting_add + prev + 2 * sizeof(int)) = block_add - starting_add; // prev->next = merged
 				*(long *)(block_add + 2 * sizeof(int) + sizeof(long)) = prev; // merged->back = prev
 			}
 		}
 		printf("The block with address: %p is added to available list index: %d without merging\n", block_add, order_of_block);
 	}
+	sem_post(sem_mutex);
 }
 
 int sbmem_close()
 {
-
+	sem_count = sem_open(SEM_COUNT, O_RDWR);
 	// to unmap, use munmap(void * address, size_t length)
+	// open shared memory
+	sem_wait(sem_count);
+	// int count = *(int *) (process_add);
+	// if (count >= MAX_PROCESSES_ALLOWED)
+	// 	return -1;
+	(*(int *) process_add)--;
+	sem_post(sem_count);
+
+	int fd = shm_open(SHAREDMEM_NAME, O_RDWR, 0660);
+
+	if (fd == -1) {
+		perror("Error while creating a shared memory segment.\n");
+		return -1;
+	}
+
+	struct stat sbuf;
+
+	fstat(fd, &sbuf);
+	close(fd);
+	munmap(process_add, sbuf.st_size);
 
 
 	// when process is done using the library, this function will be called
