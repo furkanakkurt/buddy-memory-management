@@ -9,3 +9,6 @@ destroy_memory_sb
 
 # .o files
 *.o
+
+# .a files
+*.a
