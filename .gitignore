@@ -1,0 +1,11 @@
+# executables
+app
+app_01
+app_02
+app_03
+buddy_memory
+create_memory_sb
+destroy_memory_sb
+
+# .o files
+*.o
